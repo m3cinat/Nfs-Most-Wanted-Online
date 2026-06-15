@@ -2178,7 +2178,7 @@ class ClientHandler:
                 self._probe_deferred_skey_frame = b""
             self._send_bootstrap_bytes(burst + self._lobby_news_with_endpoint_advertisement())
             return
-        
+        # Keepalive package. (PING)
         if cmd == "sele":
             self._registered = True
             

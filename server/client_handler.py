@@ -492,7 +492,7 @@ class ClientHandler:
     def run(self) -> None:
         conn = self.user.conn
         try:
-            timeout = _cfg_float(getattr(self.srv, "cfg", {}), "SERVER_TCP_TIMEOUT", 60.0)
+            timeout = _cfg_float(getattr(self.srv, "cfg", {}), "SERVER_TCP_TIMEOUT", 20.0)
             try:
                 conn.settimeout(timeout)
             except Exception:
@@ -502,6 +502,15 @@ class ClientHandler:
                     data = conn.recv(8192)
                 except socket.timeout:
                     if self._lobby_keep_active_race_tcp_on_timeout():
+                        if getattr(self, "_registered", False):
+                            try:
+                                frame = self._make_20922_signed_binary_message("@cnt", b"\x00", 9)
+                                self._send_bootstrap_bytes(frame)
+                                log.debug("[uid=%d] Sent heartbeat frame (@cnt) on socket timeout", self.user.uid)
+                            except Exception as e:
+                                log.warning("[uid=%d] Failed to send heartbeat frame: %s", self.user.uid, e)
+                                break
+                        
                         self.user.touch()
                         continue
                     break
@@ -526,11 +535,15 @@ class ClientHandler:
             self._cleanup_on_close()
 
     def _lobby_keep_active_race_tcp_on_timeout(self) -> bool:
+        if getattr(self, "_registered", False):
+            return True
+
         game = self.srv.games.get(int(getattr(self.user, "game", 0) or 0)) if getattr(self.user, "game", 0) else None
         if game is None or getattr(game, "state", "") != GAME_STATE_ACTIVE:
             return False
         if int(getattr(self.user, "uid", 0) or 0) not in self._lobby_game_participant_uid_set(game):
             return False
+        
         log.debug("[uid=%d] keeping idle TCP open during active race game=%s", self.user.uid, getattr(game, "id", 0))
         return True
 
@@ -2165,6 +2178,19 @@ class ClientHandler:
                 self._probe_deferred_skey_frame = b""
             self._send_bootstrap_bytes(burst + self._lobby_news_with_endpoint_advertisement())
             return
+        
+        if cmd == "sele":
+            self._registered = True
+            
+            if hasattr(self, 'user') and self.user:
+                self.user.connected = True
+                self.user.race_detached_at = 0.0
+                self.user.touch()
+                
+                self._lobby_keep_active_race_tcp_on_timeout = lambda: True
+                
+                log.info("[uid=%d] Turning on lobby keep-alive TCP.", self.user.uid)
+
         if cmd == "~png":
             self._schedule_lobby_news_auth_followups()
             return

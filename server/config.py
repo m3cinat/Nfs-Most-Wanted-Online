@@ -459,8 +459,14 @@ class Config:
                         include_path = v
                         if include_path and not os.path.isabs(include_path):
                             include_path = os.path.join(os.path.dirname(path), include_path)
-                        if include_path and not self._load_file(include_path, seen):
-                            return False
+                        if include_path:
+                            include_path = os.path.normpath(include_path)
+                            config_dir = os.path.dirname(path)
+                            if not include_path.startswith(config_dir + os.sep) and include_path != config_dir:
+                                log.warning("%s:%d include path escapes config directory: %s", path, lineno, include_path)
+                                return False
+                            if not self._load_file(include_path, seen):
+                                return False
                         continue
 
                     if k not in self._data:

@@ -18,7 +18,16 @@ DEFAULTS = {
     "LOG_CONSOLE_LEVEL":      "WARNING",
     "LOG_FILE":               "",
     "LOG_FILE_LEVEL":         "INFO",
-
+    
+    
+    #overwrite endpoint
+    "ENDPOINT_OVERWRITE":     0,
+    "ENDPOINT"          :     "",
+    
+    #overwrite listem
+    "LISTEN_OVERWRITE":       0,
+    "LISTEN"          :       "",
+    
     # Network - simplified online-server schema.
     # These keys are translated to the explicit listen/public keys after load.
     "PUBLIC_HOST":            "",
@@ -355,7 +364,9 @@ class Config:
         if race_port > 0:
             self._set_if_unspecified("RACE_LISTEN_PORT", race_port)
             self._set_if_unspecified("RACE_PUBLIC_PORT", race_port)
-
+        
+        
+        
         self._apply_endpoint_alias(
             "BOOTSTRAP_ENDPOINT",
             (),
@@ -424,6 +435,32 @@ class Config:
                 self._set_if_unspecified(dst, self._data.get(src))
             if dst in self._specified:
                 self._set_if_unspecified(src, self._data.get(dst))
+  
+        if int(self._data.get("ENDPOINT_OVERWRITE", 0)):
+            endpoint = str(self._data.get("ENDPOINT", "") or "").strip()
+
+            if endpoint:
+                for key in (
+                    "LOBBY_PUBLIC_HOST",
+                    "CONTROL_PUBLIC_HOST",
+                    "CONTROL_ALIAS_PUBLIC_HOST",
+                    "RACE_PUBLIC_HOST",
+                    "LOBBY_NEWS_HOST",
+                ):
+                    self._data[key] = endpoint
+        if int(self._data.get("LISTEN_OVERWRITE", 0)):
+            listen = str(self._data.get("LISTEN", "") or "").strip()
+
+            if listen:
+                for key in (
+                    "LOBBY_LEGACY_LISTEN_HOST",
+                    "LOBBY_LISTEN_HOST",
+                    "CONTROL_LISTEN_HOST",
+                    "CONTROL_ALIAS_LISTEN_HOST",
+                    "RACE_LISTEN_HOST",
+                    "HOST",
+                ):
+                    self._data[key] = listen
 
     def _load_file(self, path: str, seen: set[str]) -> bool:
         path = os.path.abspath(path)
